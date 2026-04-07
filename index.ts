@@ -308,9 +308,15 @@ function buildReflectionPrompt(
       ).join("\n")
     : "(no bullets yet)"
 
-  const traceStr = traces.map(t =>
-    `[${t.timestamp}] tool=${t.tool} outcome=${t.outcome ?? "unknown"}`
-  ).join("\n")
+  const traceStr = traces.map(t => {
+    const argsStr = t.args
+      ? Object.entries(t.args)
+          .filter(([, v]) => v != null && v !== "")
+          .map(([k, v]) => `${k}=${typeof v === "string" ? v.slice(0, 120) : JSON.stringify(v).slice(0, 120)}`)
+          .join(" ")
+      : ""
+    return `[${t.timestamp}] tool=${t.tool} ${argsStr} outcome=${t.outcome?.slice(0, 200) ?? "unknown"}`
+  }).join("\n")
 
   return `You are the Reflector in an ACE (Agentic Context Engineering) loop.
 
@@ -345,6 +351,18 @@ Rules:
 - Focus on ACTIONABLE lessons the agent can immediately apply next time.
 
 Respond with ONLY a JSON object, no markdown fences.`
+}
+
+function extractResponseText(response: unknown): string {
+  if (typeof response === "string") return response
+  try {
+    const r = response as { data?: { parts?: Array<{ type: string; text?: string }> } }
+    if (r?.data?.parts) {
+      const textPart = r.data.parts.find((p) => p.type === "text" && p.text)
+      if (textPart?.text) return textPart.text
+    }
+  } catch {}
+  return JSON.stringify(response)
 }
 
 /**
@@ -656,15 +674,12 @@ export const ACEPlugin: Plugin = async ({ client, directory, $ }) => {
             const response = await client.session.prompt({
               path: { id: currentSessionId ?? "default" },
               body: {
-                system: prompt,
-                parts: [{ type: "text", text: "Reflect on the execution traces and extract playbook bullets." }],
+                system: "You are the Reflector in an ACE (Agentic Context Engineering) loop. Respond with ONLY a JSON object, no markdown fences.",
+                parts: [{ type: "text", text: prompt }],
               },
             })
 
-            // Extract text from response
-            const responseText = typeof response === "string"
-              ? response
-              : JSON.stringify(response)
+            const responseText = extractResponseText(response)
 
             const reflection = parseReflection(responseText)
             if (!reflection) {
@@ -812,14 +827,12 @@ export const ACEPlugin: Plugin = async ({ client, directory, $ }) => {
             const response = await client.session.prompt({
               path: { id: currentSessionId ?? "default" },
               body: {
-                system: prompt,
-                parts: [{ type: "text", text: "Reflect on the execution traces and extract playbook bullets." }],
+                system: "You are the Reflector in an ACE (Agentic Context Engineering) loop. Respond with ONLY a JSON object, no markdown fences.",
+                parts: [{ type: "text", text: prompt }],
               },
             })
 
-          const responseText = typeof response === "string"
-            ? response
-            : JSON.stringify(response)
+          const responseText = extractResponseText(response)
 
           const reflection = parseReflection(responseText)
           if (!reflection) return
