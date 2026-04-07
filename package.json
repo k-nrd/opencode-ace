@@ -11,7 +11,7 @@
     "self-improving"
   ],
   "license": "MIT",
-  "main": "index.ts",
+  "main": "src/index.ts",
   "dependencies": {
     "@opencode-ai/plugin": "latest",
     "opencode-hashline": "file:../opencode-hashline"

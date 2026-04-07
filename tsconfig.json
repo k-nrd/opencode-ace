@@ -9,5 +9,6 @@
     "forceConsistentCasingInFileNames": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts"]
+  "include": ["src/**/*.ts", "index.ts"],
+  "exclude": ["test", "node_modules", ".opencode"]
 }
