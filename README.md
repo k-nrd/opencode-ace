@@ -19,8 +19,13 @@ No manual intervention. The harness improves itself.
 Into any project using [OpenCode](https://opencode.ai):
 
 ```bash
+# With bun
 bunx degit k-nrd/opencode-ace .opencode/plugins/opencode-ace
 cd .opencode/plugins/opencode-ace && bun install
+
+# With npm
+npx degit k-nrd/opencode-ace .opencode/plugins/opencode-ace
+cd .opencode/plugins/opencode-ace && npm install
 ```
 
 OpenCode auto-loads plugins from `.opencode/plugins/`. No config needed.
