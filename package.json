@@ -1,0 +1,23 @@
+{
+  "name": "opencode-ace",
+  "type": "module",
+  "version": "0.1.0",
+  "description": "ACE (Agentic Context Engineering) plugin for OpenCode — self-improving playbooks that accumulate strategies automatically",
+  "keywords": [
+    "opencode",
+    "plugin",
+    "ace",
+    "context-engineering",
+    "self-improving"
+  ],
+  "license": "MIT",
+  "main": "index.ts",
+  "dependencies": {
+    "@opencode-ai/plugin": "latest",
+    "opencode-hashline": "file:../opencode-hashline"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.2"
+  }
+}
