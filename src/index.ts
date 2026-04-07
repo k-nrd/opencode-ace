@@ -156,18 +156,19 @@ export const ACEPlugin: Plugin = async ({ client, directory, $ }) => {
 
     "experimental.session.compacting": async (_input, output) => {
       const playbook = loadPlaybook(directory)
-      if (!playbook) return
+      if (!playbook || !playbook.config.auto_inject || playbook.bullets.length === 0) return
 
-      output.context.push(`
-## ACE Playbook State
-Project: ${playbook.project}
-Bullets: ${playbook.bullets.length}
-Sessions: ${playbook.stats.total_sessions}
-Reflections: ${playbook.stats.total_reflections}
+      let rendered = renderPlaybook(playbook)
+      if (!rendered) return
 
-The ACE playbook is automatically injected into context. Use ace_status for details.
-Top strategies are preserved and accumulate over time.
-`)
+      if (rendered.length / 4 > playbook.config.max_inject_tokens) {
+        const sorted = [...playbook.bullets]
+          .sort((a, b) => (b.helpful_count - b.harmful_count) - (a.helpful_count - a.harmful_count))
+        const truncated = { ...playbook, bullets: sorted.slice(0, 50) }
+        rendered = renderPlaybook(truncated)
+      }
+
+      output.context.push(rendered)
     },
   }
 }

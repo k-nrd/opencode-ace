@@ -16,9 +16,24 @@ No manual intervention. The harness improves itself.
 
 ## Install
 
+Into any project using [OpenCode](https://opencode.ai):
+
 ```bash
-cp ace.ts .opencode/plugins/
-echo '{"dependencies":{"@opencode-ai/plugin":"latest"}}' > .opencode/package.json
+# Option 1: degit (clean copy, no git history)
+npx degit k-nrd/opencode-ace .opencode/plugins/opencode-ace
+cd .opencode/plugins/opencode-ace && npm install
+
+# Option 2: git clone
+git clone https://github.com/k-nrd/opencode-ace.git .opencode/plugins/opencode-ace
+cd .opencode/plugins/opencode-ace && npm install
+```
+
+OpenCode auto-loads plugins from `.opencode/plugins/`. No config needed.
+
+### Run tests
+
+```bash
+bun test
 ```
 
 ## Usage
@@ -43,8 +58,9 @@ Calls `ace_init`. Creates `.opencode/ace/` with an empty playbook.
 
 The plugin hooks run automatically:
 - `tool.execute.after` → logs traces
-- `chat.message` → injects playbook into context
-- `session.created` → tracks session count
+- `experimental.chat.system.transform` → injects playbook into context
+- `experimental.session.compacting` → preserves playbook across compaction
+- `session.idle` → runs reflect→curate cycle
 
 ### Trigger reflection
 
