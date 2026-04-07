@@ -19,12 +19,7 @@ No manual intervention. The harness improves itself.
 Into any project using [OpenCode](https://opencode.ai):
 
 ```bash
-# Option 1: degit (clean copy, no git history)
 npx degit k-nrd/opencode-ace .opencode/plugins/opencode-ace
-cd .opencode/plugins/opencode-ace && bun install
-
-# Option 2: git clone
-git clone https://github.com/k-nrd/opencode-ace.git .opencode/plugins/opencode-ace
 cd .opencode/plugins/opencode-ace && bun install
 ```
 
