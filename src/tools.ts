@@ -2,22 +2,13 @@ import { tool } from "@opencode-ai/plugin"
 import * as path from "path"
 import * as fs from "fs"
 import type { Playbook } from "./types.js"
-import type { OpencodeClient } from "@opencode-ai/sdk"
 import {
   aceDir, ensureDir, generateId, loadPlaybook, savePlaybook,
   pruneBullets, deduplicateBullets,
   TRACES_DIR, REFLECTIONS_DIR, DEFAULT_CONFIG,
 } from "./playbook.js"
 
-export interface ToolDeps {
-  client: OpencodeClient
-  directory: string
-  getSessionId: () => string | null
-}
-
-export function createTools(deps: ToolDeps) {
-  const { directory } = deps
-
+export function createTools() {
   const tools = {
     ace_init: tool({
       description:

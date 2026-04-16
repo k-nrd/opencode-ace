@@ -87,11 +87,7 @@ export const ACEPlugin: Plugin = async ({ client, directory, $ }) => {
 
   return {
 
-    tool: createTools({
-      client,
-      directory,
-      getSessionId: () => currentSessionId,
-    }),
+    tool: createTools(),
 
     config: async (input) => {
       input.command = input.command ?? {}
@@ -135,7 +131,7 @@ export const ACEPlugin: Plugin = async ({ client, directory, $ }) => {
 
       previousToolCall = { tool: input.tool, timestamp: entry.timestamp }
 
-      applyImplicitFeedback(playbook, entry, previousToolCall, directory)
+      applyImplicitFeedback(playbook, entry)
 
       sessionTraces.push(entry)
       appendTrace(directory, entry)

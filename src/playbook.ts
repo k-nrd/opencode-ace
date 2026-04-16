@@ -255,9 +255,7 @@ export function cleanupOldTraces(directory: string, maxAgeDays: number = 30): vo
 export function applyImplicitFeedback(
   playbook: Playbook,
   trace: TraceEntry,
-  previousToolCall: { tool: string; timestamp: string } | null,
-  _directory: string,
-): void {
+) {
   if (!trace.error_signal && !trace.is_retry) return
 
   const recentBullets = playbook.bullets.filter(b => {
