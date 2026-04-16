@@ -57,6 +57,7 @@ Calls `ace_init`. Creates `.opencode/ace/` with an empty playbook.
 ### Then just work normally
 
 The plugin hooks run automatically:
+
 - `tool.execute.after` → logs traces
 - `experimental.chat.system.transform` → injects playbook into context
 - `experimental.session.compacting` → preserves playbook across compaction
@@ -110,6 +111,7 @@ Uses trigram Jaccard similarity (no embedding model required). When bullets exce
 ### Grow-and-refine (from ACE paper)
 
 Instead of monolithic prompt rewriting (which causes "context collapse"), bullets are:
+
 - **Added** incrementally as deltas
 - **Updated** in place (counters only)
 - **Merged** when similar (keeping the higher-scoring version)
@@ -132,22 +134,22 @@ This prevents the information loss that plagues other context adaptation methods
 
 Set via `ace_init` args or edit `playbook.json` directly:
 
-| Key | Default | Description |
-|-----|---------|-------------|
-| `max_bullets` | 200 | Dedup/prune triggers at 80% of this |
-| `dedup_threshold` | 0.85 | Trigram similarity threshold for merging |
-| `prune_threshold` | -2 | Min net score (helpful - harmful) to keep |
-| `auto_inject` | true | Inject playbook into chat context |
-| `max_inject_tokens` | 8000 | Max injected context size |
+| Key                 | Default | Description                               |
+| ------------------- | ------- | ----------------------------------------- |
+| `max_bullets`       | 200     | Dedup/prune triggers at 80% of this       |
+| `dedup_threshold`   | 0.85    | Trigram similarity threshold for merging  |
+| `prune_threshold`   | -2      | Min net score (helpful - harmful) to keep |
+| `auto_inject`       | true    | Inject playbook into chat context         |
+| `max_inject_tokens` | 8000    | Max injected context size                 |
 
 ## ACE vs Meta-Harness
 
-| | ACE (this plugin) | Meta-Harness |
-|---|---|---|
-| **Optimizes** | Context/prompts (bullets) | Code (full harness files) |
-| **Automation** | Fully automatic | Needs eval runs + proposer |
-| **Scope** | Strategies, pitfalls, patterns | Retrieval, orchestration, tool logic |
-| **Best for** | Any project, immediate benefit | Benchmark optimization campaigns |
+|                | ACE (this plugin)              | Meta-Harness                         |
+| -------------- | ------------------------------ | ------------------------------------ |
+| **Optimizes**  | Context/prompts (bullets)      | Code (full harness files)            |
+| **Automation** | Fully automatic                | Needs eval runs + proposer           |
+| **Scope**      | Strategies, pitfalls, patterns | Retrieval, orchestration, tool logic |
+| **Best for**   | Any project, immediate benefit | Benchmark optimization campaigns     |
 
 Use this plugin for everyday self-improvement. Use Meta-Harness when you need to optimize the actual harness code against a benchmark.
 

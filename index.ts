@@ -1,1 +1,1 @@
-export { ACEPlugin, default } from "./src/index.js"
+export { ACEPlugin, default } from "./src/index.js";
