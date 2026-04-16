@@ -26,6 +26,21 @@ export interface Playbook {
   config: PlaybookConfig
 }
 
+export interface RenderOptions {
+  tags?: Set<string>
+  minScore?: number
+  alwaysCategories?: string[]
+}
+
+export interface FeedbackEntry {
+  bullet_id: string
+  rating: "helpful" | "harmful" | "neutral"
+  strength: number
+  note?: string
+  timestamp: string
+  session_id: string | null
+}
+
 export interface PlaybookConfig {
   max_bullets: number
   dedup_threshold: number
@@ -35,6 +50,12 @@ export interface PlaybookConfig {
   curation_prompt: string | null
   auto_inject: boolean
   max_inject_tokens: number
+  min_score_to_inject: number
+  max_reflection_rounds: number
+  min_traces_for_reflection: number
+  stale_bullet_ttl_days: number
+  inject_categories: string[]
+  tag_matching: boolean
 }
 
 export interface TraceEntry {
@@ -44,6 +65,10 @@ export interface TraceEntry {
   args: Record<string, unknown>
   outcome: string | null
   duration_ms: number | null
+  exit_code: number | null
+  is_retry: boolean
+  file_extension: string | null
+  error_signal: boolean
 }
 
 export interface ReflectionResult {

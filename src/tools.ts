@@ -1,15 +1,13 @@
 import { tool } from "@opencode-ai/plugin"
 import * as path from "path"
 import * as fs from "fs"
-import type { Bullet, Playbook, TraceEntry } from "./types.js"
+import type { Playbook } from "./types.js"
 import type { OpencodeClient } from "@opencode-ai/sdk"
 import {
   aceDir, ensureDir, generateId, loadPlaybook, savePlaybook,
-  loadRecentTraces, renderPlaybook, buildReflectionPrompt, applyReflection,
   pruneBullets, deduplicateBullets,
   TRACES_DIR, REFLECTIONS_DIR, DEFAULT_CONFIG,
 } from "./playbook.js"
-import { extractResponseText, parseReflection } from "./reflect.js"
 
 export interface ToolDeps {
   client: OpencodeClient
@@ -18,16 +16,15 @@ export interface ToolDeps {
 }
 
 export function createTools(deps: ToolDeps) {
-  const { client, directory, getSessionId } = deps
+  const { directory } = deps
 
-  return {
-
+  const tools = {
     ace_init: tool({
       description:
-        "Initialize an ACE playbook for this project. Creates the .opencode/ace/ directory " +
-        "with a playbook.json that will accumulate strategies, pitfalls, and domain knowledge " +
-        "automatically as you work. The playbook improves itself through a Reflector→Curator " +
-        "loop that runs after each session.",
+        "Initialize an ACE playbook for this project. **Always check first** by looking for `.opencode/ace/playbook.json` or using ace_status. " +
+        "If ACE is already initialized, this tool will return early with a message indicating the playbook already exists. " +
+        "Creates the .opencode/ace/ directory with a playbook.json that will accumulate strategies, pitfalls, and domain knowledge " +
+        "automatically as you work. The playbook improves itself through a Reflector→Curator loop that runs after each session.",
       args: {
         project_name: tool.schema.string().optional().describe(
           "Human-readable project name (defaults to directory basename)"
@@ -109,180 +106,37 @@ export function createTools(deps: ToolDeps) {
       },
     }),
 
-    ace_status: tool({
-      description:
-        "View the current ACE playbook status: bullet count by category, " +
-        "top-scoring bullets, recent reflections, and config.",
-      args: {},
-      async execute(_args, context) {
-        const playbook = loadPlaybook(context.directory)
-        if (!playbook) return "No ACE playbook found. Use ace_init to create one."
-
-        const byCategory = new Map<string, number>()
-        for (const b of playbook.bullets) {
-          byCategory.set(b.category, (byCategory.get(b.category) ?? 0) + 1)
-        }
-
-        const topBullets = [...playbook.bullets]
-          .sort((a, b) => (b.helpful_count - b.harmful_count) - (a.helpful_count - a.harmful_count))
-          .slice(0, 5)
-
-        const recentTraces = loadRecentTraces(context.directory, 10)
-
-        return [
-          `# ACE Playbook: ${playbook.project}`,
-          "",
-          `Total bullets: ${playbook.bullets.length} / ${playbook.config.max_bullets}`,
-          "",
-          "By category:",
-          ...Array.from(byCategory.entries()).map(([k, v]) => `  ${k}: ${v}`),
-          "",
-          "Top bullets:",
-          ...topBullets.map(b => {
-            const net = b.helpful_count - b.harmful_count
-            return `  [${b.id}] +${b.helpful_count}/-${b.harmful_count} (net ${net}) ${(b.content ?? "").slice(0, 80)}...`
-          }),
-          "",
-          `Sessions: ${playbook.stats.total_sessions}`,
-          `Reflections: ${playbook.stats.total_reflections}`,
-          `Added/Merged/Pruned: ${playbook.stats.total_bullets_added}/${playbook.stats.total_bullets_merged}/${playbook.stats.total_bullets_pruned}`,
-          `Recent traces: ${recentTraces.length}`,
-        ].join("\n")
-      },
-    }),
-
-    ace_playbook: tool({
-      description:
-        "Read or export the current ACE playbook. Returns the full rendered playbook " +
-        "as markdown, or raw JSON for programmatic use.",
+    ace_feedback: tool({
+      description: "Provide feedback on a playbook bullet. Use this when you notice a bullet was helpful or harmful during your work.",
       args: {
-        format: tool.schema.enum(["markdown", "json"]).optional().describe(
-          "Output format (default: markdown)"
+        bullet_id: tool.schema.string().describe("The ID of the bullet to rate"),
+        rating: tool.schema.enum(["helpful", "harmful", "neutral"]).describe(
+          "Was this bullet helpful, harmful, or neutral for the current task?"
         ),
-        category: tool.schema.string().optional().describe(
-          "Filter by category (strategy, pitfall, domain, tool_use, pattern)"
+        strength: tool.schema.number().min(1).max(3).optional().describe(
+          "Signal strength: 1=weak, 2=strong, 3=very strong. Defaults to 1. " +
+          "Use 3 for explicit, unambiguous reactions like 'perfect' or 'undo that'. " +
+          "Use 2 for clear reactions like 'thanks' or 'wrong'. Use 1 for subtle or inferred signals."
         ),
+        note: tool.schema.string().optional().describe("Optional explanation of why this rating was given"),
       },
       async execute(args, context) {
         const playbook = loadPlaybook(context.directory)
-        if (!playbook) return "No ACE playbook found."
+        if (!playbook) return "No ACE playbook found. Use ace_init first."
 
-        let bullets = playbook.bullets
-        if (args.category) {
-          bullets = bullets.filter(b => b.category === args.category)
+        const bullet = playbook.bullets.find(b => b.id === args.bullet_id)
+        if (!bullet) return `Bullet ${args.bullet_id} not found.`
+
+        const delta = args.strength ?? 1
+        if (args.rating === "helpful") {
+          bullet.helpful_count += delta
+        } else if (args.rating === "harmful") {
+          bullet.harmful_count += delta
         }
+        bullet.updated_at = new Date().toISOString()
+        savePlaybook(context.directory, playbook)
 
-        if (args.format === "json") {
-          return JSON.stringify(bullets, null, 2)
-        }
-
-        const filtered = { ...playbook, bullets }
-        return renderPlaybook(filtered) || "(empty playbook)"
-      },
-    }),
-
-    ace_reflect: tool({
-      description:
-        "Manually trigger a reflection cycle. Normally this runs automatically " +
-        "after each session, but you can force it to process recent traces immediately. " +
-        "Uses the LLM to analyze execution traces and extract new playbook bullets.",
-      args: {
-        max_traces: tool.schema.number().optional().describe(
-          "Max recent traces to reflect on (default: 50)"
-        ),
-        custom_insight: tool.schema.string().optional().describe(
-          "Optional: manually add a specific insight instead of LLM reflection. " +
-          "Format: 'category:content' e.g. 'pitfall:Never run rm -rf without confirming the path first'"
-        ),
-      },
-      async execute(args, context) {
-        const playbook = loadPlaybook(context.directory)
-        if (!playbook) return "No ACE playbook found."
-
-        if (args.custom_insight) {
-          const colonIdx = args.custom_insight.indexOf(":")
-          if (colonIdx === -1) return "Format: 'category:content'"
-          const category = args.custom_insight.slice(0, colonIdx).trim() as Bullet["category"]
-          const content = args.custom_insight.slice(colonIdx + 1).trim()
-          const validCats = ["strategy", "pitfall", "domain", "tool_use", "pattern"]
-          if (!validCats.includes(category)) return `Invalid category. Use: ${validCats.join(", ")}`
-
-          const bullet: Bullet = {
-            id: generateId(),
-            content,
-            category,
-            helpful_count: 0,
-            harmful_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            source_session: null,
-            tags: [],
-          }
-          playbook.bullets.push(bullet)
-          playbook.stats.total_bullets_added++
-          savePlaybook(context.directory, playbook)
-          return `Added bullet [${bullet.id}]: ${content}`
-        }
-
-        const traces = loadRecentTraces(context.directory, args.max_traces ?? 50)
-        if (traces.length === 0) return "No traces to reflect on yet. Work on some tasks first."
-
-        const prompt = buildReflectionPrompt(traces, playbook, playbook.config.reflection_prompt)
-
-        try {
-          const reflectSession = await client.session.create({
-            body: { title: "ACE Reflection" },
-          })
-          const sessionId = reflectSession.data!.id
-
-          let responseText: string
-          try {
-            const response = await client.session.prompt({
-              path: { id: sessionId },
-              body: {
-                system: "You are the Reflector in an ACE (Agentic Context Engineering) loop. Respond with ONLY a JSON object, no markdown fences.",
-                parts: [{ type: "text", text: prompt }],
-              },
-            })
-            responseText = extractResponseText(response)
-          } finally {
-            await client.session.delete({ path: { id: sessionId } }).catch(() => {})
-          }
-
-          const reflection = parseReflection(responseText)
-          if (!reflection) {
-            return "Reflection produced unparseable output. Saving raw response for debugging.\n\n" + responseText.slice(0, 500)
-          }
-
-          const result = applyReflection(playbook, reflection, context.sessionID)
-          savePlaybook(context.directory, playbook)
-
-          const reflPath = path.join(
-            aceDir(context.directory), REFLECTIONS_DIR,
-            `${new Date().toISOString().replace(/[:.]/g, "-")}.json`
-          )
-          fs.writeFileSync(reflPath, JSON.stringify({
-            timestamp: new Date().toISOString(),
-            traces_analyzed: traces.length,
-            reflection,
-            result,
-          }, null, 2))
-
-          return [
-            "Reflection complete.",
-            "",
-            `Traces analyzed: ${traces.length}`,
-            `Bullets added: ${result.added}`,
-            `Bullets updated: ${result.updated}`,
-            `Bullets merged (dedup): ${result.merged}`,
-            `Bullets pruned: ${result.pruned}`,
-            `Total bullets: ${playbook.bullets.length}`,
-            "",
-            `Reasoning: ${reflection.reasoning}`,
-          ].join("\n")
-        } catch (err) {
-          return `Reflection failed: ${err}`
-        }
+        return `Bullet ${args.bullet_id} (${bullet.content.slice(0, 60)}...) rated ${args.rating} (strength ${delta}). Score: +${bullet.helpful_count}/-${bullet.harmful_count}`
       },
     }),
 
@@ -317,4 +171,6 @@ export function createTools(deps: ToolDeps) {
       },
     }),
   }
+
+  return tools
 }
